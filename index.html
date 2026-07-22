@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>UNACADEMY</title>
+    
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📚</text></svg>">
+    
+    <style>
+        :root {
+            --bg-color: #0b1120;
+            --card-bg: #1e293b;
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 20px 40px;
+            overflow-x: hidden;
+        }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 2px solid #1e293b;
+            padding-bottom: 20px;
+            margin-bottom: 30px;
+        }
+
+        h1 {
+            margin: 0;
+            font-size: 28px;
+            letter-spacing: 1px;
+            color: white; 
+        }
+
+        .buttons-container {
+            display: flex;
+            gap: 10px;
+        }
+
+        .update-btn {
+            background-color: #20E3B2;
+            color: #000;
+            border: none;
+            padding: 12px 24px;
+            font-size: 16px;
+            font-weight: bold;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: transform 0.2s, background-color 0.2s;
+        }
+
+        .update-btn:hover {
+            transform: scale(1.05);
+            background-color: #1bc49a;
+        }
+
+        .reset-btn {
+            background-color: #1e293b;
+            color: white;
+            border: none;
+            padding: 12px 15px;
+            font-size: 14px;
+            border-radius: 8px;
+            cursor: pointer;
+        }
+
+        .reset-btn:hover {
+            background-color: #E50914;
+        }
+
+        #folderInput {
+            display: none;
+        }
+
+        #grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+            gap: 25px;
+        }
+
+        .card {
+            background-color: var(--card-bg);
+            border-radius: 12px;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            min-height: 140px;
+            box-shadow: 0 8px 20px rgba(0,0,0,0.4);
+            transition: transform 0.2s;
+            border-top: 5px solid;
+            cursor: grab;
+        }
+
+        .card:active {
+            cursor: grabbing;
+            opacity: 0.8;
+        }
+
+        .card:hover {
+            transform: translateY(-5px);
+        }
+
+        .card-title {
+            margin: 0;
+            font-size: 18px;
+            outline: none;
+            word-wrap: break-word;
+            overflow: hidden;
+            display: -webkit-box;
+            -webkit-line-clamp: 3;
+            -webkit-box-orient: vertical;
+        }
+
+        .card-title:focus {
+            background-color: #334155;
+            padding: 2px 5px;
+            border-radius: 4px;
+        }
+
+        .open-link {
+            text-decoration: none;
+            color: white;
+            background-color: #334155;
+            padding: 8px 12px;
+            border-radius: 6px;
+            text-align: center;
+            font-size: 14px;
+            margin-top: 15px;
+            transition: background 0.2s;
+        }
+
+        .open-link:hover {
+            background-color: #475569; 
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>📚 UNACADEMY</h1>
+        
+        <div class="buttons-container">
+            <button class="reset-btn" onclick="clearDashboard()">Clear All</button>
+            
+            <button class="update-btn" onclick="document.getElementById('folderInput').click()">
+                Update
+            </button>
+        </div>
+        
+        <input type="file" id="folderInput" webkitdirectory directory multiple>
+    </header>
+
+    <div id="breadcrumb" style="margin-bottom: 20px; font-size: 18px; font-weight: bold; color: #888;"></div>
+    <div id="grid"></div>
+
+    <script>
+        const colors = ['#FF3366', '#20E3B2', '#FFD166', '#118AB2', '#9D4EDD', '#06D6A0', '#EF476F', '#FF9F1C'];
+        let bookmarks = JSON.parse(localStorage.getItem('courseflix_bookmarks')) || [];
+        
+        const migrateBookmarks = (items) => {
+            items.forEach(item => {
+                if (!item.type) item.type = 'file';
+                if (item.children) migrateBookmarks(item.children);
+            });
+        };
+        migrateBookmarks(bookmarks);
+
+        let pathStack = [];
+        const grid = document.getElementById('grid');
+        const breadcrumbDiv = document.getElementById('breadcrumb');
+
+        function navigateToHash() {
+            const hash = decodeURIComponent(window.location.hash.substring(1));
+            if (!hash) {
+                pathStack = [];
+                renderCards();
+                return;
+            }
+            
+            const parts = hash.split('/').filter(Boolean);
+            let currentLevel = bookmarks;
+            let newStack = [];
+            
+            for (let i = 0; i < parts.length; i++) {
+                const folder = currentLevel.find(item => item.type === 'folder' && item.title === parts[i]);
+                if (folder) {
+                    newStack.push(folder);
+                    currentLevel = folder.children;
+                } else {
+                    break;
+                }
+            }
+            
+            pathStack = newStack;
+            renderCards();
+        }
+
+        window.addEventListener('hashchange', navigateToHash);
+
+        window.clearDashboard = function() {
+            if(confirm("Are you sure you want to clear all courses from the dashboard?")) {
+                bookmarks = [];
+                pathStack = [];
+                history.pushState("", document.title, window.location.pathname + window.location.search);
+                saveLayout();
+                renderCards();
+            }
+        }
+
+        function updateBreadcrumb() {
+            if (pathStack.length === 0) {
+                breadcrumbDiv.innerHTML = '<span style="color: var(--text-main);">🏠 Home</span>';
+            } else {
+                let html = '<a href="#" onclick="goHome()" style="color: #20E3B2; text-decoration: none;">🏠 Home</a>';
+                pathStack.forEach((folder, i) => {
+                    const isLast = i === pathStack.length - 1;
+                    html += ` <span style="color: #555; margin: 0 5px;">/</span> `;
+                    if (isLast) {
+                        html += `<span style="color: var(--text-main);">${folder.title}</span>`;
+                    } else {
+                        html += `<a href="#" onclick="goToLevel(${i})" style="color: #20E3B2; text-decoration: none;">${folder.title}</a>`;
+                    }
+                });
+                breadcrumbDiv.innerHTML = html;
+            }
+        }
+
+        window.goHome = function() {
+            history.pushState("", document.title, window.location.pathname + window.location.search);
+            navigateToHash();
+        }
+
+        window.goToLevel = function(index) {
+            const newStack = pathStack.slice(0, index + 1);
+            const newHash = newStack.map(f => encodeURIComponent(f.title)).join('/');
+            window.location.hash = newHash;
+        }
+
+        window.enterFolder = function(index) {
+            const currentViewArray = pathStack.length === 0 ? bookmarks : pathStack[pathStack.length - 1].children;
+            const folder = currentViewArray[index];
+            const currentHash = window.location.hash.substring(1);
+            const newHash = currentHash ? currentHash + '/' + encodeURIComponent(folder.title) : encodeURIComponent(folder.title);
+            window.location.hash = newHash;
+        }
+
+        function renderCards() {
+            grid.innerHTML = '';
+            const currentViewArray = pathStack.length === 0 ? bookmarks : pathStack[pathStack.length - 1].children;
+
+            currentViewArray.forEach((bookmark, index) => {
+                const card = document.createElement('div');
+                card.className = 'card';
+                card.style.borderTopColor = bookmark.color || '#333';
+                
+                card.draggable = true;
+                card.addEventListener('dragstart', (e) => dragStart(e, index));
+                card.addEventListener('dragover', dragOver);
+                card.addEventListener('drop', (e) => drop(e, index));
+
+                if (bookmark.type === 'folder') {
+                    card.innerHTML = `
+                        <div style="display:flex; flex-direction:column; align-items:center; gap: 5px; flex-grow: 1; justify-content: center;">
+                            <span style="font-size: 36px; line-height: 1;">📁</span>
+                            <h3 class="card-title" contenteditable="true" spellcheck="false" onblur="updateTitle(${index}, this.innerText)" style="text-align:center; -webkit-line-clamp: 2;">
+                                ${bookmark.title}
+                            </h3>
+                            <div style="font-size: 12px; color: #888;">${bookmark.children.length} item(s)</div>
+                        </div>
+                        <button onclick="enterFolder(${index})" class="open-link" style="background-color: #20E3B2; color: #000; border:none; cursor:pointer; width: 100%; font-weight: bold; padding: 10px; margin-top: 10px; border-radius: 6px;">Enter Folder ➔</button>
+                    `;
+                } else {
+                    card.innerHTML = `
+                        <div style="display:flex; flex-direction:column; flex-grow: 1; justify-content: flex-start;">
+                            <h3 class="card-title" contenteditable="true" spellcheck="false" onblur="updateTitle(${index}, this.innerText)">
+                                ${bookmark.title}
+                            </h3>
+                        </div>
+                        <a href="${bookmark.url}" target="_blank" class="open-link" style="display:block; text-align:center;">Open File ↗</a>
+                    `;
+                }
+                grid.appendChild(card);
+            });
+            updateBreadcrumb();
+        }
+
+        function saveLayout() {
+            localStorage.setItem('courseflix_bookmarks', JSON.stringify(bookmarks));
+        }
+
+        window.updateTitle = function(index, newTitle) {
+            const currentViewArray = pathStack.length === 0 ? bookmarks : pathStack[pathStack.length - 1].children;
+            currentViewArray[index].title = newTitle;
+            saveLayout();
+        }
+
+        document.getElementById('folderInput').addEventListener('change', function(e) {
+            const files = Array.from(e.target.files);
+            
+            const htmlFiles = files.filter(f => {
+                const isHTML = f.name.toLowerCase().endsWith('.html');
+                const isNotIndex = f.name.toLowerCase() !== 'index.html';
+                const isNotDashboard = f.name.toLowerCase() !== 'courseflixacademy.html';
+                return isHTML && isNotIndex && isNotDashboard;
+            });
+
+            bookmarks = [];
+            pathStack = [];
+            history.pushState("", document.title, window.location.pathname + window.location.search);
+
+            htmlFiles.forEach(file => {
+                const parts = file.webkitRelativePath.split('/');
+                parts.shift(); // Removes the top folder name
+                
+                let currentLevel = bookmarks;
+                for (let i = 0; i < parts.length - 1; i++) {
+                    const folderName = parts[i];
+                    let folder = currentLevel.find(item => item.type === 'folder' && item.title === folderName);
+                    if (!folder) {
+                        folder = {
+                            id: Date.now() + Math.random(),
+                            title: folderName,
+                            type: 'folder',
+                            children: [],
+                            color: colors[Math.floor(Math.random() * colors.length)]
+                        };
+                        currentLevel.push(folder);
+                    }
+                    currentLevel = folder.children;
+                }
+
+                const isLocal = window.location.protocol === 'file:';
+                
+                let urlParts = file.webkitRelativePath.split('/');
+                const pathSegments = window.location.pathname.split('/').filter(Boolean);
+                const currentFolderName = pathSegments.length > 1 ? pathSegments[pathSegments.length - 2] : null;
+                
+                if (urlParts[0] === currentFolderName || urlParts[0] === decodeURIComponent(currentFolderName)) {
+                    urlParts.shift();
+                }
+
+                const relativeUrl = isLocal ? urlParts.map(encodeURIComponent).join('/') : encodeURIComponent(file.name);
+                
+                currentLevel.push({
+                    id: Date.now() + Math.random(),
+                    title: file.name.replace('.html', ''),
+                    type: 'file',
+                    url: relativeUrl,
+                    color: colors[Math.floor(Math.random() * colors.length)]
+                });
+            });
+
+            saveLayout();
+            renderCards();
+            e.target.value = ''; 
+        });
+
+        let dragStartIndex;
+
+        function dragStart(e, index) {
+            dragStartIndex = index;
+            e.dataTransfer.effectAllowed = "move";
+        }
+
+        function dragOver(e) {
+            e.preventDefault();
+        }
+
+        function drop(e, dropIndex) {
+            e.preventDefault();
+            const currentViewArray = pathStack.length === 0 ? bookmarks : pathStack[pathStack.length - 1].children;
+            const draggedItem = currentViewArray.splice(dragStartIndex, 1)[0];
+            currentViewArray.splice(dropIndex, 0, draggedItem);
+            saveLayout();
+            renderCards();
+        }
+
+        navigateToHash();
+    </script>
+</body>
+</html>
